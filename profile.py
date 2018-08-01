@@ -16,10 +16,17 @@ def load_tasks_queque(fn, recompute = False):
         data: list
             tasks queue like ['0x0001', '0x0002', '0x000a', ...]
     """
+
+    temp_fn = fn.split('.')
+    if temp_fn[-1] == 'pkl':
+        fn = '.'.join(temp_fn[:-1])
+    
     if (not recompute) and os.path.isfile(fn + '.pkl'):
+        print "\t\t\twhat fuck!!!"
         with open(fn+'.pkl', 'rb') as f:
             return pickle.load(f)
-    
+
+        
     with open(fn, 'r') as f:
         data = map(lambda e: re.findall('0x00[0-9a-f]{2}', e)[0], f.readlines())
         with open(fn+'.pkl', 'wb') as f1:
@@ -110,17 +117,39 @@ def check_adf(tasks_queue, pre_task, next_task, block=10):
     stores = map(lambda e: get_trans_fre_mat(e), splited_data)
     #prob_trans = lambda e: float(e[pre_task][next_task])/ sum(e[pre_task].values())
     def prob_trans(e):
-        try:
-            return float(e[pre_task][next_task])/ sum(e[pre_task].values())
-        except:
-            return None
+        if pre_task in e.keys():
+            if next_task in e[pre_task].keys():
+                if sum(e[pre_task].values()) > 0:
+                    return float(e[pre_task][next_task])/ sum(e[pre_task].values())
+        return None
     prob_serise = map(prob_trans, stores)
-    if None in prob_serise:
-        print "None"
-        return
-    print ts.adfuller(prob_serise)
+
+    # remove to those group(as a item in stores) have no `next_task ` or `pre_task`
+    prob_serise = filter(lambda e: e != None, prob_serise)
+    if len(prob_serise) > 2:
+        print "\t\t\ndebug", prob_serise
+        result =  ts.adfuller(prob_serise)
+        print result
+        return result
+    else:
+        print 'No data'
+        return 'No data'
     
-    
+
+def conclusion(results):
+    cnt_1 = 0
+    cnt_5 = 0
+    cnt_10 = 0
+    results = filter(lambda e: e != 'No data', results)
+    for e in results:
+        print 'debug 12', e[0], e[4]['1%']
+        if float(e[0]) < float(e[4]['1%']):
+            cnt_1 += 1
+    try:
+        print '1%: ', float(cnt_1) / len(results), '\ntotal: ', len(results)
+    except:
+        print 'length of result is 0'
+
     
 
 
@@ -130,10 +159,14 @@ if __name__ == '__main__':
     Only I am able to understand those codes. Contact me by paradoxt@gmail.com
     '''
     import tableprint as tp
+
+    results = []
     for e1 in os.walk('./dataset'):
         for e2 in e1[2]:
             fn = os.path.join(e1[0], e2)
-            data = load_tasks_queque(fn, recompute = False)
+            #if 'RadioCountToLeds1/2.txt' not in fn: continue
+            if '.pkl' in fn: continue
+            data = load_tasks_queque(fn, recompute = True)
             if len(data) < 2: continue
             
             #result = occupy_feature(data)
@@ -144,11 +177,14 @@ if __name__ == '__main__':
             print '-' * 15, fn, '-' * 15
             hot_taskl_pair = choice_most_task(get_trans_fre_mat(data), 2)
             print hot_taskl_pair
-            check_adf(data, hot_taskl_pair[0][0], hot_taskl_pair[0][1])
+            results.append(check_adf(data, hot_taskl_pair[0][0], hot_taskl_pair[0][1]))
             #print tasks_sequence_split(range(12), 3)
             print '\n\n'
             
-            break # Only watch 1.txt from node 1
+            #break # Only watch 1.txt from node 1
+    conclusion(results)
+    
+
         
         
 
